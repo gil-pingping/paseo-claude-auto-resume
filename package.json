@@ -1,0 +1,23 @@
+{
+  "name": "claude-auto-resume-paseo-plugin",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Resume Paseo Claude agents after a five-hour usage reset",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gil-pingping/paseo-claude-auto-resume.git"
+  },
+  "license": "MIT",
+  "type": "module",
+  "files": ["paseo-plugin.json", "OVERVIEW.md", "index.server.ts"],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --test test/*.test.ts"
+  },
+  "devDependencies": {
+    "@getpaseo/plugin": "0.11.1",
+    "@getpaseo/protocol": "0.11.1",
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.3"
+  }
+}
