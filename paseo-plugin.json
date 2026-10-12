@@ -1,6 +1,6 @@
 {
   "id": "claude-auto-resume",
-  "name": "Claude auto resume",
+  "name": "Claude and Codex auto resume",
   "requirements": {
     "paseo": ">=0.11.1"
   }

@@ -7,19 +7,23 @@ const RESET_GRACE_MS = 60 * 1000;
 const CONTINUE_PROMPT =
   "한도가 갱신됐습니다. 중단된 요청을 현재 상태에서 이어서 진행해. 이미 끝난 작업은 반복하지 마.";
 
-export function latestAssistantText(timeline: readonly AgentTimelineItem[]): string {
+export function latestTurnText(timeline: readonly AgentTimelineItem[]): string {
   for (let i = timeline.length - 1; i >= 0; i--) {
     const item = timeline[i];
     if (item.type === "user_message") break;
+    if (item.type === "error") return item.message.trim();
     if (item.type === "assistant_message") return item.text.trim();
   }
   return "";
 }
 
-export function parseResumeAt(text: string, now: number): number | null {
-  const match = /^You've hit your session limit\s*·\s*resets\s+(\d{1,2})(?::(\d{2}))?(am|pm)\s+\(Asia\/Seoul\)$/i.exec(
-    text.trim(),
-  );
+export function parseResumeAt(text: string, now: number, provider: "claude" | "codex"): number | null {
+  const message = text.trim();
+  const match =
+    provider === "claude"
+      ? /^You've hit your session limit\s*·\s*resets\s+(\d{1,2})(?::(\d{2}))?(am|pm)\s+\(Asia\/Seoul\)$/i.exec(message)
+      // shortcut: Codex omits timezone; use Seoul until its error includes one.
+      : /^You['’]ve hit your usage limit\.[^\n]*\btry again at\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)\.?$/i.exec(message);
   if (!match) return null;
 
   const hour = Number(match[1]);
@@ -57,15 +61,14 @@ export default function contribute(server: PluginServerContext) {
     attempted.delete(agent.id);
   });
   const removeEnded = server.on("agent.turn_ended", (event, { paseo }) => {
-    if (event.agent.provider !== "claude" || event.agent.parentAgentId !== null) return;
+    const provider = event.agent.provider;
+    if ((provider !== "claude" && provider !== "codex") || event.agent.parentAgentId !== null) return;
     if (event.outcome.kind === "canceled") return;
 
-    const message =
-      event.outcome.kind === "failed"
-        ? event.outcome.error.message
-        : latestAssistantText(event.timeline);
     const observedAt = Date.now();
-    const resumeAt = parseResumeAt(message, observedAt);
+    const resumeAt =
+      (event.outcome.kind === "failed" ? parseResumeAt(event.outcome.error.message, observedAt, provider) : null) ??
+      parseResumeAt(latestTurnText(event.timeline), observedAt, provider);
     if (resumeAt === null || attempted.get(event.agent.id) === resumeAt) return;
     if (pending.get(event.agent.id)?.resumeAt === resumeAt) return;
 
@@ -83,14 +86,14 @@ export default function contribute(server: PluginServerContext) {
           if (current.status === "running" || current.status === "initializing") return;
           if (current.lastUserMessageAt && Date.parse(current.lastUserMessageAt) > observedAt) return;
           await agent.send(CONTINUE_PROMPT);
-          console.log("Resumed Claude agent after usage reset", agentId);
+          console.log("Resumed agent after usage reset", event.agent.provider, agentId);
         } catch (error) {
-          console.error("Claude auto resume failed", agentId, error);
+          console.error("Auto resume failed", event.agent.provider, agentId, error);
         }
       })();
     }, resumeAt - observedAt);
     pending.set(agentId, { resumeAt, timer });
-    console.log("Scheduled Claude agent after usage reset", agentId, new Date(resumeAt).toISOString());
+    console.log("Scheduled agent after usage reset", event.agent.provider, agentId, new Date(resumeAt).toISOString());
   });
 
   return () => {

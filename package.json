@@ -1,8 +1,8 @@
 {
   "name": "claude-auto-resume-paseo-plugin",
   "private": true,
-  "version": "0.1.0",
-  "description": "Resume Paseo Claude agents after a five-hour usage reset",
+  "version": "0.2.0",
+  "description": "Resume Paseo Claude and Codex agents after usage reset",
   "repository": {
     "type": "git",
     "url": "https://github.com/gil-pingping/paseo-claude-auto-resume.git"
